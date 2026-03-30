@@ -155,12 +155,9 @@ export function GridCanvas() {
     [interactionMode, selectedTerrain, getCellFromEvent, setCell]
   );
 
-  const handleMouseUp = useCallback(
-    (_e: React.MouseEvent<HTMLCanvasElement>) => {
-      dragState.current.active = false;
-    },
-    []
-  );
+  const handleMouseUp = useCallback(() => {
+    dragState.current.active = false;
+  }, []);
 
   return (
     <canvas

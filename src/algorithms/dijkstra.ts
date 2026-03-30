@@ -1,5 +1,6 @@
 import type { AlgorithmFn } from '../types';
 import { MinHeap } from '../utils/minHeap';
+import { getDirections } from './utils';
 
 export const dijkstra: AlgorithmFn = (cells, start, end, { allowDiagonals }) => {
   const t0 = performance.now();
@@ -18,9 +19,7 @@ export const dijkstra: AlgorithmFn = (cells, start, end, { allowDiagonals }) => 
   const openSet = new Set<string>([startKey]);
   const closedSet = new Set<string>();
 
-  const dirs = allowDiagonals
-    ? [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]
-    : [[-1,0],[1,0],[0,-1],[0,1]];
+  const dirs = getDirections(allowDiagonals);
 
   while (open.size > 0) {
     const current = open.pop()!;

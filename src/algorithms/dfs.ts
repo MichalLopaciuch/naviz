@@ -1,4 +1,5 @@
 import type { AlgorithmFn } from '../types';
+import { getDirections } from './utils';
 
 export const dfs: AlgorithmFn = (cells, start, end, { allowDiagonals }) => {
   const t0 = performance.now();
@@ -12,9 +13,7 @@ export const dfs: AlgorithmFn = (cells, start, end, { allowDiagonals }) => {
 
   const stack: [number, number][] = [start];
 
-  const dirs = allowDiagonals
-    ? [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]
-    : [[-1,0],[1,0],[0,-1],[0,1]];
+  const dirs = getDirections(allowDiagonals);
 
   while (stack.length > 0) {
     const current = stack.pop()!;

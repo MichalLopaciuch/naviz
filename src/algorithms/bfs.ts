@@ -1,4 +1,5 @@
 import type { AlgorithmFn } from '../types';
+import { getDirections } from './utils';
 
 export const bfs: AlgorithmFn = (cells, start, end, { allowDiagonals }) => {
   const t0 = performance.now();
@@ -13,9 +14,7 @@ export const bfs: AlgorithmFn = (cells, start, end, { allowDiagonals }) => {
   const queue: [number, number][] = [start];
   visited.add(key(start[0], start[1]));
 
-  const dirs = allowDiagonals
-    ? [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]
-    : [[-1,0],[1,0],[0,-1],[0,1]];
+  const dirs = getDirections(allowDiagonals);
 
   while (queue.length > 0) {
     const current = queue.shift()!;

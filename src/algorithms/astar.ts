@@ -1,5 +1,6 @@
 import type { AlgorithmFn } from '../types';
 import { MinHeap } from '../utils/minHeap';
+import { getDirections } from './utils';
 
 const manhattan = (a: [number, number], b: [number, number]) =>
   Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
@@ -26,9 +27,7 @@ export const astar: AlgorithmFn = (cells, start, end, { heuristic, allowDiagonal
   const openSet = new Set<string>([startKey]);
   const closedSet = new Set<string>();
 
-  const dirs = allowDiagonals
-    ? [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]
-    : [[-1,0],[1,0],[0,-1],[0,1]];
+  const dirs = getDirections(allowDiagonals);
 
   while (open.size > 0) {
     const current = open.pop()!;

@@ -1,5 +1,4 @@
-import { TERRAIN_COLORS, TERRAIN_COSTS, COLORS } from '../constants';
-import type { TerrainType } from '../types';
+import { COLORS } from '../constants';
 
 const CELL_LEGEND = [
   { color: COLORS.start, label: 'Start' },
@@ -22,22 +21,6 @@ export function TerrainLegend() {
               style={{ backgroundColor: color }}
             />
             <span className="text-xs text-slate-400">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      <h3 className="text-xs font-semibold text-slate-400 mt-4 mb-2">Terrain Costs</h3>
-      <div className="space-y-1.5">
-        {(Object.keys(TERRAIN_COLORS) as TerrainType[]).map((terrain) => (
-          <div key={terrain} className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-4 h-4 rounded-sm border border-slate-600 flex-shrink-0"
-                style={{ backgroundColor: TERRAIN_COLORS[terrain] }}
-              />
-              <span className="text-xs text-slate-400 capitalize">{terrain}</span>
-            </div>
-            <span className="text-xs font-mono text-slate-500">×{TERRAIN_COSTS[terrain]}</span>
           </div>
         ))}
       </div>

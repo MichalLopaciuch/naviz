@@ -1,18 +1,11 @@
 import type { TerrainType } from './types';
 
-export const GRID_ROWS = 40;
-export const GRID_COLS = 60;
+/** Base pixel size of each grid cell (no zoom transforms — always 1:1). */
+export const BASE_CELL_PX = 5;
 
-/** Base pixel size of each grid cell at zoom 1×. */
-export const BASE_CELL_PX = 3;
-
-/** Hard caps so extremely large viewports don't overwhelm the algorithms. */
-export const MAX_GRID_ROWS = 400;
-export const MAX_GRID_COLS = 600;
-
-/** Brush size limits shared between the store and the ControlPanel slider. */
-export const MIN_BRUSH_SIZE = 1;
-export const MAX_BRUSH_SIZE = 20;
+/** Hard caps to keep algorithm performance reasonable on very large viewports. */
+export const MAX_GRID_ROWS = 200;
+export const MAX_GRID_COLS = 320;
 
 export const TERRAIN_COSTS: Record<TerrainType, number> = {
   plains: 1,

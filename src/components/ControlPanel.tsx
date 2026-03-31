@@ -1,54 +1,29 @@
-import { useEffect } from 'react';
 import { useGridStore } from '../store/gridStore';
 import { useAlgorithmStore } from '../store/algorithmStore';
-import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
+import type { AlgorithmType, HeuristicType, InteractionMode } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
-import { MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from '../constants';
 
-const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
-  { value: 'plains', label: 'Plains (×1)' },
-  { value: 'forest', label: 'Forest (×3)' },
-  { value: 'swamp', label: 'Swamp (×5)' },
-  { value: 'mountain', label: 'Mountain (×10)' },
-];
-
-const DRAW_MODES: { value: InteractionMode; label: string; requiresDijkstra?: boolean }[] = [
+const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'wall', label: 'Wall' },
   { value: 'start', label: 'Start' },
   { value: 'end', label: 'End' },
   { value: 'erase', label: 'Erase' },
-  { value: 'terrain', label: 'Terrain' },
-  { value: 'color', label: 'Color' },
-  { value: 'weight', label: 'Weight', requiresDijkstra: true },
 ];
 
 export function ControlPanel() {
   const {
     interactionMode,
-    selectedTerrain,
-    selectedCustomColor,
     showGrid,
-    brushSize,
     clearGrid,
     clearWalls,
     setInteractionMode,
-    setSelectedTerrain,
-    setSelectedCustomColor,
     setShowGrid,
-    setBrushSize,
     cells,
     startCell,
     endCell,
   } = useGridStore();
   const { selectedAlgorithm, heuristic, setAlgorithm, setHeuristic, runAlgorithm, reset } =
     useAlgorithmStore();
-
-  // If algorithm changes away from Dijkstra while in weight mode, switch to wall.
-  useEffect(() => {
-    if (selectedAlgorithm !== 'dijkstra' && interactionMode === 'weight') {
-      setInteractionMode('wall');
-    }
-  }, [selectedAlgorithm, interactionMode, setInteractionMode]);
 
   const handleRun = () => {
     if (!startCell || !endCell) {
@@ -92,42 +67,19 @@ export function ControlPanel() {
 
       {/* Draw modes */}
       <div className="flex items-center gap-1 border border-slate-600 rounded p-1">
-        {DRAW_MODES.map(({ value, label, requiresDijkstra }) => {
-          const disabled = requiresDijkstra && selectedAlgorithm !== 'dijkstra';
-          return (
-            <button
-              key={value}
-              onClick={() => !disabled && setInteractionMode(value)}
-              disabled={disabled}
-              title={disabled ? 'Weight brush is only available with Dijkstra' : undefined}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                interactionMode === value
-                  ? 'bg-blue-600 text-white'
-                  : disabled
-                  ? 'text-slate-600 cursor-not-allowed'
-                  : 'text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Brush size */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-400">Brush</label>
-        <input
-          type="range"
-          min={MIN_BRUSH_SIZE}
-          max={MAX_BRUSH_SIZE}
-          step={1}
-          value={brushSize}
-          onChange={(e) => setBrushSize(Number(e.target.value))}
-          className="w-20 accent-blue-500"
-          title="Brush size (or scroll on canvas)"
-        />
-        <span className="text-xs text-slate-400 w-4 text-right">{brushSize}</span>
+        {DRAW_MODES.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setInteractionMode(value)}
+            className={`text-xs px-2 py-1 rounded transition-colors ${
+              interactionMode === value
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Show Grid toggle */}
@@ -141,37 +93,6 @@ export function ControlPanel() {
       >
         Grid
       </button>
-
-      {/* Terrain picker (shown when terrain mode is active) */}
-      {interactionMode === 'terrain' && (
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-400">Terrain</label>
-          <select
-            className="bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
-            value={selectedTerrain}
-            onChange={(e) => setSelectedTerrain(e.target.value as TerrainType)}
-          >
-            {TERRAIN_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Color picker (shown when color mode is active) */}
-      {interactionMode === 'color' && (
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-400">Color</label>
-          <input
-            type="color"
-            value={selectedCustomColor}
-            onChange={(e) => setSelectedCustomColor(e.target.value)}
-            className="w-8 h-7 rounded border border-slate-600 bg-slate-700 cursor-pointer p-0.5"
-            title="Pick paint color"
-          />
-          <span className="text-xs font-mono text-slate-400">{selectedCustomColor}</span>
-        </div>
-      )}
 
       {/* Actions */}
       <button

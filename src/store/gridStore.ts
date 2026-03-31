@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Cell, CellType, InteractionMode, TerrainType } from '../types';
-import { GRID_ROWS, GRID_COLS, TERRAIN_COSTS } from '../constants';
+import { GRID_ROWS, GRID_COLS, TERRAIN_COSTS, MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from '../constants';
 
 const makeCell = (row: number, col: number): Cell => ({
   row,
@@ -15,6 +15,16 @@ const makeGrid = (rows: number, cols: number): Cell[][] =>
     Array.from({ length: cols }, (_, c) => makeCell(r, c))
   );
 
+export interface CellBatchUpdate {
+  row: number;
+  col: number;
+  type: CellType;
+  terrain?: TerrainType;
+  customColor?: string;
+  /** When provided, overrides the weight derived from terrain. */
+  weight?: number;
+}
+
 interface GridState {
   rows: number;
   cols: number;
@@ -24,7 +34,10 @@ interface GridState {
   interactionMode: InteractionMode;
   selectedTerrain: TerrainType;
   selectedCustomColor: string;
-  setCell: (row: number, col: number, type: CellType, terrain?: TerrainType, customColor?: string) => void;
+  showGrid: boolean;
+  brushSize: number;
+  setCell: (row: number, col: number, type: CellType, terrain?: TerrainType, customColor?: string, weight?: number) => void;
+  setCellBatch: (updates: CellBatchUpdate[]) => void;
   setCellRect: (r1: number, c1: number, r2: number, c2: number, type: CellType, terrain?: TerrainType) => void;
   setStartCell: (row: number, col: number) => void;
   setEndCell: (row: number, col: number) => void;
@@ -34,6 +47,8 @@ interface GridState {
   setInteractionMode: (mode: InteractionMode) => void;
   setSelectedTerrain: (terrain: TerrainType) => void;
   setSelectedCustomColor: (color: string) => void;
+  setShowGrid: (v: boolean) => void;
+  setBrushSize: (n: number) => void;
 }
 
 export const useGridStore = create<GridState>((set) => ({
@@ -45,14 +60,41 @@ export const useGridStore = create<GridState>((set) => ({
   interactionMode: 'wall',
   selectedTerrain: 'forest',
   selectedCustomColor: '#6366f1',
+  showGrid: false,
+  brushSize: 3,
 
-  setCell: (row, col, type, terrain, customColor) =>
+  setCell: (row, col, type, terrain, customColor, weight) =>
     set((state) => {
       const cells = state.cells.map((r) => [...r]);
       const t = terrain ?? cells[row][col].terrain;
-      const weight = type === 'wall' ? Infinity : TERRAIN_COSTS[t];
+      const w =
+        weight !== undefined
+          ? weight
+          : type === 'wall'
+          ? Infinity
+          : TERRAIN_COSTS[t];
       cells[row] = [...cells[row]];
-      cells[row][col] = { ...cells[row][col], type, terrain: t, weight, customColor };
+      cells[row][col] = { ...cells[row][col], type, terrain: t, weight: w, customColor };
+      return { cells };
+    }),
+
+  setCellBatch: (updates) =>
+    set((state) => {
+      if (updates.length === 0) return {};
+      // Only clone rows that will actually be modified to avoid O(rows) allocations.
+      const affectedRows = new Set(updates.map((u) => u.row));
+      const cells = state.cells.map((r, i) => (affectedRows.has(i) ? [...r] : r));
+      for (const { row, col, type, terrain, customColor, weight } of updates) {
+        if (row < 0 || row >= cells.length || col < 0 || col >= (cells[row]?.length ?? 0)) continue;
+        const t = terrain ?? cells[row][col].terrain;
+        const w =
+          weight !== undefined
+            ? weight
+            : type === 'wall'
+            ? Infinity
+            : TERRAIN_COSTS[t];
+        cells[row][col] = { ...cells[row][col], type, terrain: t, weight: w, customColor };
+      }
       return { cells };
     }),
 
@@ -143,4 +185,6 @@ export const useGridStore = create<GridState>((set) => ({
   setInteractionMode: (mode) => set({ interactionMode: mode }),
   setSelectedTerrain: (terrain) => set({ selectedTerrain: terrain }),
   setSelectedCustomColor: (color) => set({ selectedCustomColor: color }),
+  setShowGrid: (v) => set({ showGrid: v }),
+  setBrushSize: (n) => set({ brushSize: Math.min(MAX_BRUSH_SIZE, Math.max(MIN_BRUSH_SIZE, n)) }),
 }));

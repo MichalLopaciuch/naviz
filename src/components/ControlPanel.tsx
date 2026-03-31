@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { useGridStore } from '../store/gridStore';
 import { useAlgorithmStore } from '../store/algorithmStore';
 import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
+import { MIN_BRUSH_SIZE, MAX_BRUSH_SIZE } from '../constants';
 
 const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
   { value: 'plains', label: 'Plains (×1)' },
@@ -10,38 +12,43 @@ const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
   { value: 'mountain', label: 'Mountain (×10)' },
 ];
 
-const DRAW_MODES: { value: InteractionMode; label: string }[] = [
+const DRAW_MODES: { value: InteractionMode; label: string; requiresDijkstra?: boolean }[] = [
   { value: 'wall', label: 'Wall' },
   { value: 'start', label: 'Start' },
   { value: 'end', label: 'End' },
   { value: 'erase', label: 'Erase' },
   { value: 'terrain', label: 'Terrain' },
   { value: 'color', label: 'Color' },
+  { value: 'weight', label: 'Weight', requiresDijkstra: true },
 ];
-
-const GRID_MIN_ROWS = 5;
-const GRID_MAX_ROWS = 100;
-const GRID_MIN_COLS = 5;
-const GRID_MAX_COLS = 150;
 
 export function ControlPanel() {
   const {
     interactionMode,
     selectedTerrain,
     selectedCustomColor,
-    rows,
-    cols,
+    showGrid,
+    brushSize,
     clearGrid,
     clearWalls,
     setInteractionMode,
     setSelectedTerrain,
     setSelectedCustomColor,
-    resizeGrid,
+    setShowGrid,
+    setBrushSize,
     cells,
     startCell,
     endCell,
   } = useGridStore();
-  const { selectedAlgorithm, heuristic, allowDiagonals, setAlgorithm, setHeuristic, setAllowDiagonals, runAlgorithm, reset } = useAlgorithmStore();
+  const { selectedAlgorithm, heuristic, setAlgorithm, setHeuristic, runAlgorithm, reset } =
+    useAlgorithmStore();
+
+  // If algorithm changes away from Dijkstra while in weight mode, switch to wall.
+  useEffect(() => {
+    if (selectedAlgorithm !== 'dijkstra' && interactionMode === 'weight') {
+      setInteractionMode('wall');
+    }
+  }, [selectedAlgorithm, interactionMode, setInteractionMode]);
 
   const handleRun = () => {
     if (!startCell || !endCell) {
@@ -50,18 +57,6 @@ export function ControlPanel() {
     }
     reset();
     runAlgorithm(cells, startCell, endCell);
-  };
-
-  const handleRowsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Math.min(GRID_MAX_ROWS, Math.max(GRID_MIN_ROWS, parseInt(e.target.value, 10) || GRID_MIN_ROWS));
-    resizeGrid(v, cols);
-    reset();
-  };
-
-  const handleColsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Math.min(GRID_MAX_COLS, Math.max(GRID_MIN_COLS, parseInt(e.target.value, 10) || GRID_MIN_COLS));
-    resizeGrid(rows, v);
-    reset();
   };
 
   return (
@@ -95,33 +90,57 @@ export function ControlPanel() {
         </div>
       )}
 
-      {/* Diagonal toggle */}
-      <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={allowDiagonals}
-          onChange={(e) => setAllowDiagonals(e.target.checked)}
-          className="accent-blue-500"
-        />
-        Diagonals
-      </label>
-
       {/* Draw modes */}
       <div className="flex items-center gap-1 border border-slate-600 rounded p-1">
-        {DRAW_MODES.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setInteractionMode(value)}
-            className={`text-xs px-2 py-1 rounded transition-colors ${
-              interactionMode === value
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {DRAW_MODES.map(({ value, label, requiresDijkstra }) => {
+          const disabled = requiresDijkstra && selectedAlgorithm !== 'dijkstra';
+          return (
+            <button
+              key={value}
+              onClick={() => !disabled && setInteractionMode(value)}
+              disabled={disabled}
+              title={disabled ? 'Weight brush is only available with Dijkstra' : undefined}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                interactionMode === value
+                  ? 'bg-blue-600 text-white'
+                  : disabled
+                  ? 'text-slate-600 cursor-not-allowed'
+                  : 'text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Brush size */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-slate-400">Brush</label>
+        <input
+          type="range"
+          min={MIN_BRUSH_SIZE}
+          max={MAX_BRUSH_SIZE}
+          step={1}
+          value={brushSize}
+          onChange={(e) => setBrushSize(Number(e.target.value))}
+          className="w-20 accent-blue-500"
+          title="Brush size (or scroll on canvas)"
+        />
+        <span className="text-xs text-slate-400 w-4 text-right">{brushSize}</span>
+      </div>
+
+      {/* Show Grid toggle */}
+      <button
+        onClick={() => setShowGrid(!showGrid)}
+        className={`text-xs px-2 py-1 rounded border transition-colors ${
+          showGrid
+            ? 'bg-blue-600 border-blue-500 text-white'
+            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+        }`}
+      >
+        Grid
+      </button>
 
       {/* Terrain picker (shown when terrain mode is active) */}
       {interactionMode === 'terrain' && (
@@ -153,30 +172,6 @@ export function ControlPanel() {
           <span className="text-xs font-mono text-slate-400">{selectedCustomColor}</span>
         </div>
       )}
-
-      {/* Grid size */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-400">Grid</label>
-        <input
-          type="number"
-          value={rows}
-          min={GRID_MIN_ROWS}
-          max={GRID_MAX_ROWS}
-          onChange={handleRowsChange}
-          className="w-14 bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
-          title="Rows"
-        />
-        <span className="text-xs text-slate-500">×</span>
-        <input
-          type="number"
-          value={cols}
-          min={GRID_MIN_COLS}
-          max={GRID_MAX_COLS}
-          onChange={handleColsChange}
-          className="w-14 bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
-          title="Columns"
-        />
-      </div>
 
       {/* Actions */}
       <button

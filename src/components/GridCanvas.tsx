@@ -1,12 +1,78 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useGridStore } from '../store/gridStore';
 import { useAlgorithmStore } from '../store/algorithmStore';
-import { COLORS, TERRAIN_COLORS } from '../constants';
+import { COLORS, TERRAIN_COLORS, BASE_CELL_PX, MAX_GRID_ROWS, MAX_GRID_COLS } from '../constants';
 import { bresenhamLine } from '../utils/bresenham';
 import type { Cell } from '../types';
+import type { CellBatchUpdate } from '../store/gridStore';
+import type { InteractionMode, TerrainType } from '../types';
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 8;
+
+/** Brush boundary offset: cells whose centre is within `brushSize - BRUSH_BOUNDARY_OFFSET`
+ *  of the centre are included, giving smooth circular edges. */
+const BRUSH_BOUNDARY_OFFSET = 0.5;
+
+/** Delay (ms) between the last container resize event and the grid update. */
+const RESIZE_DEBOUNCE_MS = 150;
+
+/** Interpolates a colour between dark-blue (weight=1) and amber (weight=10). */
+function weightToColor(w: number): string {
+  const t = (w - 1) / 9;
+  const r = Math.round(30 + t * (217 - 30));
+  const g = Math.round(41 + t * (151 - 41));
+  const b = Math.round(59 + t * (6 - 59));
+  return `rgb(${r},${g},${b})`;
+}
+
+/**
+ * Returns all cell updates produced by applying a circular brush centred on
+ * (centerRow, centerCol).  Start/end are handled separately and not included.
+ */
+function getBrushUpdates(
+  centerRow: number,
+  centerCol: number,
+  brushSize: number,
+  rows: number,
+  cols: number,
+  mode: InteractionMode,
+  selectedTerrain: TerrainType,
+  selectedCustomColor: string
+): CellBatchUpdate[] {
+  const updates: CellBatchUpdate[] = [];
+  const r = Math.ceil(brushSize);
+  for (let dr = -r; dr <= r; dr++) {
+    for (let dc = -r; dc <= r; dc++) {
+      const dist = Math.sqrt(dr * dr + dc * dc);
+      if (dist > brushSize - BRUSH_BOUNDARY_OFFSET) continue;
+      const nr = centerRow + dr;
+      const nc = centerCol + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+
+      if (mode === 'wall') {
+        updates.push({ row: nr, col: nc, type: 'wall' });
+      } else if (mode === 'erase') {
+        updates.push({ row: nr, col: nc, type: 'empty', customColor: undefined });
+      } else if (mode === 'terrain') {
+        updates.push({ row: nr, col: nc, type: 'empty', terrain: selectedTerrain });
+      } else if (mode === 'color') {
+        updates.push({ row: nr, col: nc, type: 'empty', customColor: selectedCustomColor });
+      } else if (mode === 'weight') {
+        const w = Math.max(1, Math.round(10 - dist));
+        updates.push({
+          row: nr,
+          col: nc,
+          type: 'empty',
+          terrain: 'plains',
+          customColor: weightToColor(w),
+          weight: w,
+        });
+      }
+    }
+  }
+  return updates;
+}
 
 function drawGrid(
   ctx: CanvasRenderingContext2D,
@@ -14,11 +80,10 @@ function drawGrid(
   exploredSet: Set<string>,
   frontierSet: Set<string>,
   pathSet: Set<string>,
-  cellW: number,
-  cellH: number
+  showGrid: boolean
 ) {
   const rows = cells.length;
-  const cols = cells[0].length;
+  const cols = cells[0]?.length ?? 0;
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -43,10 +108,13 @@ function drawGrid(
       }
 
       ctx.fillStyle = color;
-      ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
-      ctx.strokeStyle = COLORS.grid;
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(c * cellW, r * cellH, cellW, cellH);
+      ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+
+      if (showGrid) {
+        ctx.strokeStyle = COLORS.grid;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+      }
     }
   }
 }
@@ -68,6 +136,9 @@ export function GridCanvas() {
   const lastPanPos = useRef<{ x: number; y: number } | null>(null);
   const isSpaceHeld = useRef(false);
 
+  // Debounce timer for grid resize on container changes.
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Container size tracked in state so layout changes trigger a re-render and
   // resize the canvas accordingly.
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
@@ -76,19 +147,19 @@ export function GridCanvas() {
   const interactionMode = useGridStore((s) => s.interactionMode);
   const selectedTerrain = useGridStore((s) => s.selectedTerrain);
   const selectedCustomColor = useGridStore((s) => s.selectedCustomColor);
-  const setCell = useGridStore((s) => s.setCell);
+  const showGrid = useGridStore((s) => s.showGrid);
+  const brushSize = useGridStore((s) => s.brushSize);
   const setStartCell = useGridStore((s) => s.setStartCell);
   const setEndCell = useGridStore((s) => s.setEndCell);
+  const setCellBatch = useGridStore((s) => s.setCellBatch);
+  const resizeGrid = useGridStore((s) => s.resizeGrid);
 
   const result = useAlgorithmStore((s) => s.result);
   const currentStep = useAlgorithmStore((s) => s.currentStep);
+  const resetAlgorithm = useAlgorithmStore((s) => s.reset);
 
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
-
-  // Derived cell dimensions based on container size.
-  const cellW = cols > 0 ? containerSize.w / cols : 0;
-  const cellH = rows > 0 ? containerSize.h / rows : 0;
 
   // Measure container and update canvas intrinsic size.
   useEffect(() => {
@@ -103,10 +174,32 @@ export function GridCanvas() {
     return () => ro.disconnect();
   }, []);
 
+  // Auto-resize the backing grid when the container size changes.
+  // Debounced so rapid window-resize events don't thrash the store.
+  useEffect(() => {
+    const { w, h } = containerSize;
+    if (w === 0 || h === 0) return;
+
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
+      const newRows = Math.min(MAX_GRID_ROWS, Math.max(1, Math.floor(h / BASE_CELL_PX)));
+      const newCols = Math.min(MAX_GRID_COLS, Math.max(1, Math.floor(w / BASE_CELL_PX)));
+      const { rows: curRows, cols: curCols } = useGridStore.getState();
+      if (newRows !== curRows || newCols !== curCols) {
+        resizeGrid(newRows, newCols);
+        resetAlgorithm();
+      }
+    }, RESIZE_DEBOUNCE_MS);
+
+    return () => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    };
+  }, [containerSize, resizeGrid, resetAlgorithm]);
+
   // Build the sets needed for algorithm overlay and redraw.
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || cellW === 0 || cellH === 0) return;
+    if (!canvas || containerSize.w === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -128,35 +221,41 @@ export function GridCanvas() {
     ctx.save();
     ctx.translate(panXRef.current, panYRef.current);
     ctx.scale(scaleRef.current, scaleRef.current);
-    drawGrid(ctx, cells, exploredSet, frontierSet, pathSet, cellW, cellH);
+    drawGrid(ctx, cells, exploredSet, frontierSet, pathSet, showGrid);
     ctx.restore();
-  }, [cells, result, currentStep, cellW, cellH]);
+  }, [cells, result, currentStep, showGrid, containerSize]);
 
   // Redraw whenever data or size changes.
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // Prevent default middle-mouse scroll behaviour on the canvas.
+  // Scroll: plain scroll → brush size; Ctrl+scroll → zoom.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
 
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      const oldScale = scaleRef.current;
-      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * zoomFactor));
-
-      // Zoom toward cursor position.
-      panXRef.current = mouseX - (mouseX - panXRef.current) * (newScale / oldScale);
-      panYRef.current = mouseY - (mouseY - panYRef.current) * (newScale / oldScale);
-      scaleRef.current = newScale;
-      redraw();
+      if (e.ctrlKey) {
+        // Zoom toward cursor position.
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const oldScale = scaleRef.current;
+        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * zoomFactor));
+        panXRef.current = mouseX - (mouseX - panXRef.current) * (newScale / oldScale);
+        panYRef.current = mouseY - (mouseY - panYRef.current) * (newScale / oldScale);
+        scaleRef.current = newScale;
+        redraw();
+      } else {
+        // Adjust brush size.
+        const { brushSize: current, setBrushSize } = useGridStore.getState();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        setBrushSize(current + delta);
+      }
     };
 
     canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -193,29 +292,12 @@ export function GridCanvas() {
     (mouseX: number, mouseY: number): [number, number] | null => {
       const worldX = (mouseX - panXRef.current) / scaleRef.current;
       const worldY = (mouseY - panYRef.current) / scaleRef.current;
-      const col = Math.floor(worldX / cellW);
-      const row = Math.floor(worldY / cellH);
+      const col = Math.floor(worldX / BASE_CELL_PX);
+      const row = Math.floor(worldY / BASE_CELL_PX);
       if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
       return [row, col];
     },
-    [cellW, cellH, rows, cols]
-  );
-
-  /** Paint a single cell according to the current interaction mode. */
-  const paintCell = useCallback(
-    (row: number, col: number) => {
-      if (interactionMode === 'wall') {
-        setCell(row, col, 'wall');
-      } else if (interactionMode === 'erase') {
-        // Passing no terrain/customColor clears them back to defaults.
-        setCell(row, col, 'empty');
-      } else if (interactionMode === 'terrain') {
-        setCell(row, col, 'empty', selectedTerrain);
-      } else if (interactionMode === 'color') {
-        setCell(row, col, 'empty', undefined, selectedCustomColor);
-      }
-    },
-    [interactionMode, selectedTerrain, selectedCustomColor, setCell]
+    [rows, cols]
   );
 
   const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -254,9 +336,15 @@ export function GridCanvas() {
 
       isDragging.current = true;
       prevCell.current = [row, col];
-      paintCell(row, col);
+
+      const updates = getBrushUpdates(
+        row, col, brushSize, rows, cols,
+        interactionMode, selectedTerrain, selectedCustomColor
+      );
+      if (updates.length > 0) setCellBatch(updates);
     },
-    [canvasToCell, interactionMode, paintCell, setStartCell, setEndCell]
+    [canvasToCell, interactionMode, brushSize, rows, cols, selectedTerrain,
+     selectedCustomColor, setCellBatch, setStartCell, setEndCell]
   );
 
   const handleMouseMove = useCallback(
@@ -281,26 +369,34 @@ export function GridCanvas() {
       if (!pos) return;
       const [row, col] = pos;
 
-      // Use Bresenham to fill all cells between previous and current position.
-      if (prevCell.current) {
-        const [pr, pc] = prevCell.current;
-        const line = bresenhamLine(pr, pc, row, col);
-        // Skip the first point (already painted on previous event).
-        for (let i = 1; i < line.length; i++) {
-          const [lr, lc] = line[i];
-          if (
-            interactionMode === 'wall' ||
-            interactionMode === 'erase' ||
-            interactionMode === 'terrain' ||
-            interactionMode === 'color'
-          ) {
-            paintCell(lr, lc);
-          }
+      if (!prevCell.current) {
+        prevCell.current = [row, col];
+        return;
+      }
+
+      // Collect all unique cell updates across every Bresenham point in one
+      // store call to minimise Zustand state transitions per mouse event.
+      const [pr, pc] = prevCell.current;
+      const line = bresenhamLine(pr, pc, row, col);
+
+      const updateMap = new Map<string, CellBatchUpdate>();
+      for (let i = 1; i < line.length; i++) {
+        const [lr, lc] = line[i];
+        const updates = getBrushUpdates(
+          lr, lc, brushSize, rows, cols,
+          interactionMode, selectedTerrain, selectedCustomColor
+        );
+        for (const u of updates) {
+          const key = `${u.row},${u.col}`;
+          if (!updateMap.has(key)) updateMap.set(key, u);
         }
       }
+
+      if (updateMap.size > 0) setCellBatch(Array.from(updateMap.values()));
       prevCell.current = [row, col];
     },
-    [canvasToCell, interactionMode, paintCell, redraw]
+    [canvasToCell, interactionMode, brushSize, rows, cols,
+     selectedTerrain, selectedCustomColor, setCellBatch, redraw]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -320,6 +416,9 @@ export function GridCanvas() {
     redraw();
   }, [redraw]);
 
+  const isBrushMode =
+    interactionMode !== 'start' && interactionMode !== 'end';
+
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Zoom controls overlay */}
@@ -330,7 +429,7 @@ export function GridCanvas() {
             redraw();
           }}
           className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded flex items-center justify-center select-none"
-          title="Zoom in"
+          title="Zoom in (Ctrl+Scroll)"
         >
           +
         </button>
@@ -340,7 +439,7 @@ export function GridCanvas() {
             redraw();
           }}
           className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded flex items-center justify-center select-none"
-          title="Zoom out"
+          title="Zoom out (Ctrl+Scroll)"
         >
           −
         </button>
@@ -354,7 +453,7 @@ export function GridCanvas() {
       </div>
 
       {/* Canvas container — fills available space */}
-      <div ref={containerRef} className="flex-1 overflow-hidden">
+      <div ref={containerRef} className="relative flex-1 overflow-hidden">
         <canvas
           ref={canvasRef}
           width={containerSize.w}
@@ -365,6 +464,18 @@ export function GridCanvas() {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         />
+
+        {/* Brush size indicator */}
+        {isBrushMode && (
+          <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded pointer-events-none select-none">
+            Brush: {brushSize} • scroll to resize • Ctrl+scroll to zoom
+          </div>
+        )}
+
+        {/* Grid resolution */}
+        <div className="absolute bottom-2 right-2 text-xs text-slate-600 bg-slate-900/80 px-2 py-0.5 rounded pointer-events-none select-none">
+          {rows}×{cols}
+        </div>
       </div>
     </div>
   );

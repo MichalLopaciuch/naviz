@@ -5,14 +5,12 @@ import { ALGORITHMS } from '../algorithms';
 interface AlgorithmState {
   selectedAlgorithm: AlgorithmType;
   heuristic: HeuristicType;
-  allowDiagonals: boolean;
   result: AlgorithmResult | null;
   currentStep: number;
   isRunning: boolean;
   error: string | null;
   setAlgorithm: (alg: AlgorithmType) => void;
   setHeuristic: (h: HeuristicType) => void;
-  setAllowDiagonals: (v: boolean) => void;
   runAlgorithm: (cells: Cell[][], start: [number, number], end: [number, number]) => void;
   setCurrentStep: (step: number) => void;
   reset: () => void;
@@ -21,7 +19,6 @@ interface AlgorithmState {
 export const useAlgorithmStore = create<AlgorithmState>((set, get) => ({
   selectedAlgorithm: 'astar',
   heuristic: 'manhattan',
-  allowDiagonals: true,
   result: null,
   currentStep: 0,
   isRunning: false,
@@ -29,14 +26,13 @@ export const useAlgorithmStore = create<AlgorithmState>((set, get) => ({
 
   setAlgorithm: (alg) => set({ selectedAlgorithm: alg }),
   setHeuristic: (h) => set({ heuristic: h }),
-  setAllowDiagonals: (v) => set({ allowDiagonals: v }),
 
   runAlgorithm: (cells, start, end) => {
-    const { selectedAlgorithm, heuristic, allowDiagonals } = get();
+    const { selectedAlgorithm, heuristic } = get();
     const fn = ALGORITHMS[selectedAlgorithm];
     set({ isRunning: true, error: null });
     try {
-      const result = fn(cells, start, end, { heuristic, allowDiagonals });
+      const result = fn(cells, start, end, { heuristic, allowDiagonals: true });
       set({ result, currentStep: result.exploredOrder.length, isRunning: false });
     } catch (e) {
       set({ error: String(e), isRunning: false });

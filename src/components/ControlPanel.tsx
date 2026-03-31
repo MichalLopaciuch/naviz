@@ -16,10 +16,31 @@ const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'end', label: 'End' },
   { value: 'erase', label: 'Erase' },
   { value: 'terrain', label: 'Terrain' },
+  { value: 'color', label: 'Color' },
 ];
 
+const GRID_MIN_ROWS = 5;
+const GRID_MAX_ROWS = 100;
+const GRID_MIN_COLS = 5;
+const GRID_MAX_COLS = 150;
+
 export function ControlPanel() {
-  const { interactionMode, selectedTerrain, clearGrid, clearWalls, setInteractionMode, setSelectedTerrain, cells, startCell, endCell } = useGridStore();
+  const {
+    interactionMode,
+    selectedTerrain,
+    selectedCustomColor,
+    rows,
+    cols,
+    clearGrid,
+    clearWalls,
+    setInteractionMode,
+    setSelectedTerrain,
+    setSelectedCustomColor,
+    resizeGrid,
+    cells,
+    startCell,
+    endCell,
+  } = useGridStore();
   const { selectedAlgorithm, heuristic, allowDiagonals, setAlgorithm, setHeuristic, setAllowDiagonals, runAlgorithm, reset } = useAlgorithmStore();
 
   const handleRun = () => {
@@ -29,6 +50,18 @@ export function ControlPanel() {
     }
     reset();
     runAlgorithm(cells, startCell, endCell);
+  };
+
+  const handleRowsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Math.min(GRID_MAX_ROWS, Math.max(GRID_MIN_ROWS, parseInt(e.target.value, 10) || GRID_MIN_ROWS));
+    resizeGrid(v, cols);
+    reset();
+  };
+
+  const handleColsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Math.min(GRID_MAX_COLS, Math.max(GRID_MIN_COLS, parseInt(e.target.value, 10) || GRID_MIN_COLS));
+    resizeGrid(rows, v);
+    reset();
   };
 
   return (
@@ -105,6 +138,45 @@ export function ControlPanel() {
           </select>
         </div>
       )}
+
+      {/* Color picker (shown when color mode is active) */}
+      {interactionMode === 'color' && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-400">Color</label>
+          <input
+            type="color"
+            value={selectedCustomColor}
+            onChange={(e) => setSelectedCustomColor(e.target.value)}
+            className="w-8 h-7 rounded border border-slate-600 bg-slate-700 cursor-pointer p-0.5"
+            title="Pick paint color"
+          />
+          <span className="text-xs font-mono text-slate-400">{selectedCustomColor}</span>
+        </div>
+      )}
+
+      {/* Grid size */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-slate-400">Grid</label>
+        <input
+          type="number"
+          value={rows}
+          min={GRID_MIN_ROWS}
+          max={GRID_MAX_ROWS}
+          onChange={handleRowsChange}
+          className="w-14 bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
+          title="Rows"
+        />
+        <span className="text-xs text-slate-500">×</span>
+        <input
+          type="number"
+          value={cols}
+          min={GRID_MIN_COLS}
+          max={GRID_MAX_COLS}
+          onChange={handleColsChange}
+          className="w-14 bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
+          title="Columns"
+        />
+      </div>
 
       {/* Actions */}
       <button

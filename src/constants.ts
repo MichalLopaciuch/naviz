@@ -2,7 +2,6 @@ import type { TerrainType } from './types';
 
 export const GRID_ROWS = 40;
 export const GRID_COLS = 60;
-export const CELL_SIZE = 16;
 
 export const TERRAIN_COSTS: Record<TerrainType, number> = {
   plains: 1,

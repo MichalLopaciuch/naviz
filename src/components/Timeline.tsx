@@ -31,25 +31,25 @@ export function Timeline() {
       <div className="flex gap-1">
         <button
           onClick={() => setCurrentStep(0)}
-          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded whitespace-nowrap leading-none"
         >
           |◀
         </button>
         <button
           onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded whitespace-nowrap leading-none"
         >
           ◀
         </button>
         <button
           onClick={() => setCurrentStep(Math.min(total, currentStep + 1))}
-          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded whitespace-nowrap leading-none"
         >
           ▶
         </button>
         <button
           onClick={() => setCurrentStep(total)}
-          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded"
+          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded whitespace-nowrap leading-none"
         >
           ▶|
         </button>

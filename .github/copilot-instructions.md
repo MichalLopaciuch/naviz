@@ -105,3 +105,10 @@ Always fix TypeScript errors and lint warnings before submitting a PR.
 - Prefer named exports. `App.tsx` uses a default export by convention only.
 - State updates use Zustand `set` — keep stores focused; do not store derived data that can be computed from existing state.
 - Use `clsx` + `tailwind-merge` (via a `cn()` helper if present) for conditional class names.
+
+## Keeping Docs Up to Date
+
+At the end of every session, check whether your changes require updates to either of these files and update them if so:
+
+- **`README.md`** — update if you added, removed, or renamed features, scripts, or usage steps visible to end users.
+- **`.github/copilot-instructions.md`** — update if you changed the tech stack, project layout, architectural patterns, build commands, or coding conventions so that future sessions start with accurate context.

@@ -27,7 +27,7 @@ export function useKeyboardShortcuts(onHelp: () => void) {
         setSelectedTerrain,
         clearGrid,
       } = useGridStore.getState();
-      const { selectedAlgorithm, setAlgorithm, reset } = useAlgorithmStore.getState();
+      const { selectedAlgorithm, setAlgorithm, reset, runAlgorithm } = useAlgorithmStore.getState();
 
       switch (e.key) {
         case 'w':
@@ -65,6 +65,17 @@ export function useKeyboardShortcuts(onHelp: () => void) {
             reset();
           }
           break;
+        case ' ': {
+          e.preventDefault();
+          const { cells, startCell, endCell } = useGridStore.getState();
+          if (!startCell || !endCell) {
+            alert('Please place a start and end cell first.');
+            break;
+          }
+          reset();
+          runAlgorithm(cells, startCell, endCell);
+          break;
+        }
         case '/':
         case '?':
           onHelpRef.current();

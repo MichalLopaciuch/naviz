@@ -6,6 +6,7 @@ interface HelpModalProps {
 }
 
 const SHORTCUTS = [
+  { key: 'Space', description: 'Run algorithm' },
   { key: 'W', description: 'Wall mode' },
   { key: 'S', description: 'Start / End mode' },
   { key: 'E', description: 'Erase mode' },

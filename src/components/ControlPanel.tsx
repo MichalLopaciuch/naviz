@@ -3,13 +3,6 @@ import { useAlgorithmStore } from '../store/algorithmStore';
 import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
 
-const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
-  { value: 'plains', label: 'Plains (×1)' },
-  { value: 'forest', label: 'Forest (×3)' },
-  { value: 'swamp', label: 'Swamp (×5)' },
-  { value: 'mountain', label: 'Mountain (×10)' },
-];
-
 const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'wall', label: 'Wall' },
   { value: 'start', label: 'Start' },
@@ -18,9 +11,27 @@ const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'terrain', label: 'Terrain' },
 ];
 
+const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
+  { value: 'forest', label: 'Forest (×5)' },
+  { value: 'mountain', label: 'Mountain (×10)' },
+];
+
 export function ControlPanel() {
-  const { interactionMode, selectedTerrain, clearGrid, clearWalls, setInteractionMode, setSelectedTerrain, cells, startCell, endCell } = useGridStore();
-  const { selectedAlgorithm, heuristic, allowDiagonals, setAlgorithm, setHeuristic, setAllowDiagonals, runAlgorithm, reset } = useAlgorithmStore();
+  const {
+    interactionMode,
+    selectedTerrain,
+    showGrid,
+    clearGrid,
+    clearWalls,
+    setInteractionMode,
+    setSelectedTerrain,
+    setShowGrid,
+    cells,
+    startCell,
+    endCell,
+  } = useGridStore();
+  const { selectedAlgorithm, heuristic, setAlgorithm, setHeuristic, runAlgorithm, reset } =
+    useAlgorithmStore();
 
   const handleRun = () => {
     if (!startCell || !endCell) {
@@ -62,17 +73,6 @@ export function ControlPanel() {
         </div>
       )}
 
-      {/* Diagonal toggle */}
-      <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={allowDiagonals}
-          onChange={(e) => setAllowDiagonals(e.target.checked)}
-          className="accent-blue-500"
-        />
-        Diagonals
-      </label>
-
       {/* Draw modes */}
       <div className="flex items-center gap-1 border border-slate-600 rounded p-1">
         {DRAW_MODES.map(({ value, label }) => (
@@ -90,10 +90,10 @@ export function ControlPanel() {
         ))}
       </div>
 
-      {/* Terrain picker (shown when terrain mode is active) */}
+      {/* Terrain picker (only when terrain mode active) */}
       {interactionMode === 'terrain' && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-400">Terrain</label>
+          <label className="text-xs text-slate-400">Type</label>
           <select
             className="bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
             value={selectedTerrain}
@@ -105,6 +105,18 @@ export function ControlPanel() {
           </select>
         </div>
       )}
+
+      {/* Show Grid toggle */}
+      <button
+        onClick={() => setShowGrid(!showGrid)}
+        className={`text-xs px-2 py-1 rounded border transition-colors ${
+          showGrid
+            ? 'bg-blue-600 border-blue-500 text-white'
+            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+        }`}
+      >
+        Grid
+      </button>
 
       {/* Actions */}
       <button

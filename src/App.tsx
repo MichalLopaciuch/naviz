@@ -13,7 +13,7 @@ function App() {
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
         {/* Canvas area */}
-        <div className="flex-1 overflow-auto flex items-start justify-start p-2 bg-slate-950">
+        <div className="flex-1 overflow-hidden bg-slate-950">
           <GridCanvas />
         </div>
 

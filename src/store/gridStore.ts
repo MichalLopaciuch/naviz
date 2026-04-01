@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Cell, CellType, InteractionMode, TerrainType } from '../types';
-import { GRID_ROWS, GRID_COLS, TERRAIN_COSTS } from '../constants';
+import { TERRAIN_COSTS } from '../constants';
 
 const makeCell = (row: number, col: number): Cell => ({
   row,
@@ -15,6 +15,15 @@ const makeGrid = (rows: number, cols: number): Cell[][] =>
     Array.from({ length: cols }, (_, c) => makeCell(r, c))
   );
 
+/** Minimal unit used by setCellBatch for efficient bulk updates. */
+export interface CellBatchUpdate {
+  row: number;
+  col: number;
+  type: CellType;
+  terrain?: TerrainType;
+  weight?: number;
+}
+
 interface GridState {
   rows: number;
   cols: number;
@@ -23,49 +32,38 @@ interface GridState {
   endCell: [number, number] | null;
   interactionMode: InteractionMode;
   selectedTerrain: TerrainType;
-  setCell: (row: number, col: number, type: CellType, terrain?: TerrainType) => void;
-  setCellRect: (r1: number, c1: number, r2: number, c2: number, type: CellType, terrain?: TerrainType) => void;
+  showGrid: boolean;
+  setCellBatch: (updates: CellBatchUpdate[]) => void;
   setStartCell: (row: number, col: number) => void;
   setEndCell: (row: number, col: number) => void;
   clearGrid: () => void;
   clearWalls: () => void;
+  resizeGrid: (newRows: number, newCols: number) => void;
   setInteractionMode: (mode: InteractionMode) => void;
   setSelectedTerrain: (terrain: TerrainType) => void;
+  setShowGrid: (v: boolean) => void;
 }
 
 export const useGridStore = create<GridState>((set) => ({
-  rows: GRID_ROWS,
-  cols: GRID_COLS,
-  cells: makeGrid(GRID_ROWS, GRID_COLS),
+  rows: 40,
+  cols: 60,
+  cells: makeGrid(40, 60),
   startCell: null,
   endCell: null,
   interactionMode: 'wall',
   selectedTerrain: 'forest',
+  showGrid: false,
 
-  setCell: (row, col, type, terrain) =>
+  setCellBatch: (updates) =>
     set((state) => {
-      const cells = state.cells.map((r) => [...r]);
-      const t = terrain ?? cells[row][col].terrain;
-      const weight = type === 'wall' ? Infinity : TERRAIN_COSTS[t];
-      cells[row] = [...cells[row]];
-      cells[row][col] = { ...cells[row][col], type, terrain: t, weight };
-      return { cells };
-    }),
-
-  setCellRect: (r1, c1, r2, c2, type, terrain) =>
-    set((state) => {
-      const minR = Math.min(r1, r2);
-      const maxR = Math.max(r1, r2);
-      const minC = Math.min(c1, c2);
-      const maxC = Math.max(c1, c2);
-      const cells = state.cells.map((r) => [...r]);
-      for (let r = minR; r <= maxR; r++) {
-        cells[r] = [...cells[r]];
-        for (let c = minC; c <= maxC; c++) {
-          const t = terrain ?? cells[r][c].terrain;
-          const weight = type === 'wall' ? Infinity : TERRAIN_COSTS[t];
-          cells[r][c] = { ...cells[r][c], type, terrain: t, weight };
-        }
+      if (updates.length === 0) return {};
+      const affectedRows = new Set(updates.map((u) => u.row));
+      const cells = state.cells.map((r, i) => (affectedRows.has(i) ? [...r] : r));
+      for (const { row, col, type, terrain, weight } of updates) {
+        if (row < 0 || row >= cells.length || col < 0 || col >= cells[0]?.length) continue;
+        const t = terrain ?? cells[row][col].terrain;
+        const w = weight !== undefined ? weight : type === 'wall' ? Infinity : TERRAIN_COSTS[t];
+        cells[row][col] = { ...cells[row][col], type, terrain: t, weight: w };
       }
       return { cells };
     }),
@@ -97,8 +95,8 @@ export const useGridStore = create<GridState>((set) => ({
     }),
 
   clearGrid: () =>
-    set(() => ({
-      cells: makeGrid(GRID_ROWS, GRID_COLS),
+    set((state) => ({
+      cells: makeGrid(state.rows, state.cols),
       startCell: null,
       endCell: null,
     })),
@@ -107,12 +105,36 @@ export const useGridStore = create<GridState>((set) => ({
     set((state) => {
       const cells = state.cells.map((row) =>
         row.map((cell) =>
-          cell.type === 'wall' ? { ...cell, type: 'empty' as CellType, weight: TERRAIN_COSTS[cell.terrain] } : cell
+          cell.type === 'wall'
+            ? { ...cell, type: 'empty' as CellType, weight: TERRAIN_COSTS[cell.terrain] }
+            : cell
         )
       );
       return { cells };
     }),
 
+  resizeGrid: (newRows, newCols) =>
+    set((state) => {
+      const newCells = makeGrid(newRows, newCols);
+      const copyRows = Math.min(newRows, state.rows);
+      const copyCols = Math.min(newCols, state.cols);
+      for (let r = 0; r < copyRows; r++) {
+        for (let c = 0; c < copyCols; c++) {
+          newCells[r][c] = { ...state.cells[r][c], row: r, col: c };
+        }
+      }
+      const startCell =
+        state.startCell && state.startCell[0] < newRows && state.startCell[1] < newCols
+          ? state.startCell
+          : null;
+      const endCell =
+        state.endCell && state.endCell[0] < newRows && state.endCell[1] < newCols
+          ? state.endCell
+          : null;
+      return { rows: newRows, cols: newCols, cells: newCells, startCell, endCell };
+    }),
+
   setInteractionMode: (mode) => set({ interactionMode: mode }),
   setSelectedTerrain: (terrain) => set({ selectedTerrain: terrain }),
+  setShowGrid: (v) => set({ showGrid: v }),
 }));

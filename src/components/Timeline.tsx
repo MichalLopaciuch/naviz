@@ -7,7 +7,7 @@ export function Timeline() {
 
   if (!result) {
     return (
-      <div className="flex items-center justify-center h-12 bg-slate-800 border-t border-slate-700 text-xs text-slate-500">
+      <div className="flex items-center justify-center h-12 bg-slate-800 border-t border-slate-700 text-xs text-slate-500 flex-shrink-0">
         Run an algorithm to enable the timeline
       </div>
     );
@@ -16,7 +16,7 @@ export function Timeline() {
   const total = result.exploredOrder.length;
 
   return (
-    <div className="flex items-center gap-4 px-4 py-2 bg-slate-800 border-t border-slate-700">
+    <div className="flex items-center gap-4 px-4 h-12 bg-slate-800 border-t border-slate-700 flex-shrink-0">
       <span className="text-xs text-slate-400 whitespace-nowrap">
         Step {currentStep} / {total}
       </span>

@@ -1,5 +1,5 @@
 export type CellType = 'empty' | 'wall' | 'start' | 'end';
-export type TerrainType = 'plains' | 'forest' | 'swamp' | 'mountain';
+export type TerrainType = 'plains' | 'forest' | 'mountain';
 export type InteractionMode = 'wall' | 'start' | 'end' | 'erase' | 'terrain';
 export type HeuristicType = 'manhattan' | 'euclidean';
 export type AlgorithmType = 'astar' | 'dijkstra' | 'bfs' | 'dfs';
@@ -10,11 +10,6 @@ export interface Cell {
   type: CellType;
   terrain: TerrainType;
   weight: number;
-}
-
-export interface Snapshot {
-  explored: Set<string>;
-  frontier: Set<string>;
 }
 
 export interface AlgorithmStats {
@@ -30,6 +25,8 @@ export interface AlgorithmResult {
   stats: AlgorithmStats;
 }
 
+/** Contract every algorithm must satisfy. Adding new algorithms is as simple as
+ *  implementing this function and registering it in algorithms/index.ts. */
 export type AlgorithmFn = (
   cells: Cell[][],
   start: [number, number],

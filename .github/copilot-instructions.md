@@ -112,3 +112,7 @@ At the end of every session, check whether your changes require updates to eithe
 
 - **`README.md`** — update if you added, removed, or renamed features, scripts, or usage steps visible to end users.
 - **`.github/copilot-instructions.md`** — update if you changed the tech stack, project layout, architectural patterns, build commands, or coding conventions so that future sessions start with accurate context.
+
+Also check:
+
+- **Keyboard shortcuts** — if you added a new feature, consider whether it warrants a keyboard shortcut. If it does, implement the shortcut and add it to the in-app keyboard shortcut helper dialog so users can discover it.

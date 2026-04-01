@@ -3,6 +3,8 @@ import { useAlgorithmStore } from '../store/algorithmStore';
 export function StatsPanel() {
   const result = useAlgorithmStore((s) => s.result);
   const selectedAlgorithm = useAlgorithmStore((s) => s.selectedAlgorithm);
+  const useWasm = useAlgorithmStore((s) => s.useWasm);
+  const wasmLoading = useAlgorithmStore((s) => s.wasmLoading);
 
   if (!result) {
     return (
@@ -14,14 +16,27 @@ export function StatsPanel() {
   }
 
   const { stats } = result;
+  const engineLabel = useWasm ? 'WASM' : 'JS';
+  const engineClass = useWasm
+    ? 'bg-violet-900 text-violet-200'
+    : 'bg-slate-700 text-slate-400';
 
   return (
     <div className="p-4">
       <h2 className="text-sm font-semibold text-slate-300 mb-3">Stats</h2>
+      {wasmLoading && (
+        <p className="text-xs text-violet-400 mb-2">Loading WASM…</p>
+      )}
       <div className="space-y-2">
         <div className="flex justify-between text-xs">
           <span className="text-slate-400">Algorithm</span>
           <span className="font-medium text-blue-400 uppercase">{selectedAlgorithm}</span>
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className="text-slate-400">Engine</span>
+          <span className={`px-2 py-0.5 rounded font-mono ${engineClass}`}>
+            {engineLabel}
+          </span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-slate-400">Cells Explored</span>

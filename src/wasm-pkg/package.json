@@ -1,0 +1,15 @@
+{
+  "name": "naviz",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "naviz_bg.wasm",
+    "naviz.js",
+    "naviz.d.ts"
+  ],
+  "main": "naviz.js",
+  "types": "naviz.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

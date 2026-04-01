@@ -1,14 +1,23 @@
+import { useCallback, useState } from 'react';
 import { ControlPanel } from './components/ControlPanel';
 import { GridCanvas } from './components/GridCanvas';
 import { Timeline } from './components/Timeline';
 import { StatsPanel } from './components/StatsPanel';
 import { TerrainLegend } from './components/TerrainLegend';
+import { HelpModal } from './components/HelpModal';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function App() {
+  const [showHelp, setShowHelp] = useState(false);
+  const openHelp = useCallback(() => setShowHelp(true), []);
+  const closeHelp = useCallback(() => setShowHelp(false), []);
+
+  useKeyboardShortcuts(openHelp);
+
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
       {/* Top bar */}
-      <ControlPanel />
+      <ControlPanel onHelp={openHelp} />
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
@@ -26,6 +35,9 @@ function App() {
 
       {/* Bottom timeline */}
       <Timeline />
+
+      {/* Help modal */}
+      <HelpModal open={showHelp} onClose={closeHelp} />
     </div>
   );
 }

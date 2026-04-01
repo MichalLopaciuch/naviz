@@ -9,25 +9,23 @@ export const MAX_GRID_COLS = 320;
 
 export const TERRAIN_COSTS: Record<TerrainType, number> = {
   plains: 1,
-  forest: 3,
-  swamp: 5,
+  forest: 5,
   mountain: 10,
 };
 
 export const TERRAIN_COLORS: Record<TerrainType, string> = {
-  plains: '#1e293b',
-  forest: '#14532d',
-  swamp: '#3b2a1a',
-  mountain: '#374151',
+  plains: '#0f172a',
+  forest: '#166534',
+  mountain: '#44403c',
 };
 
 export const COLORS = {
-  empty: '#1e293b',
-  wall: '#334155',
+  empty: '#0f172a',
+  wall: '#64748b',
   start: '#22c55e',
   end: '#ef4444',
-  explored: '#bfdbfe',
-  frontier: '#fb923c',
-  path: '#fde047',
-  grid: '#0f172a',
+  explored: '#3b82f6',
+  frontier: '#f97316',
+  path: '#fbbf24',
+  grid: '#1e293b',
 };

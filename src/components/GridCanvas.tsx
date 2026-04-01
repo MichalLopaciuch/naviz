@@ -5,26 +5,26 @@ import { COLORS, TERRAIN_COLORS, BASE_CELL_PX, MAX_GRID_ROWS, MAX_GRID_COLS } fr
 import { bresenhamLine } from '../utils/bresenham';
 import type { Cell } from '../types';
 import type { CellBatchUpdate } from '../store/gridStore';
+import type { InteractionMode, TerrainType } from '../types';
 
-/** Fixed brush radius in cells. */
+/** Fixed brush radius in cells for wall/erase/terrain painting. */
 const BRUSH_SIZE = 5;
+
+/** Radius (in canvas px) for the start/end pin circles. */
+const PIN_RADIUS = BASE_CELL_PX * 1.8;
 
 /** Milliseconds to wait after the last container resize before updating the grid. */
 const RESIZE_DEBOUNCE_MS = 150;
 
-/**
- * Returns all cell updates for a circular brush centred on (centerRow, centerCol).
- * Start/end are always single-cell pins and are handled separately.
- */
 function getBrushUpdates(
   centerRow: number,
   centerCol: number,
   rows: number,
   cols: number,
-  erase: boolean
+  mode: 'wall' | 'erase' | 'terrain',
+  selectedTerrain: TerrainType
 ): CellBatchUpdate[] {
   const updates: CellBatchUpdate[] = [];
-  const type = erase ? 'empty' : 'wall';
   const radius = Math.ceil(BRUSH_SIZE);
   for (let dr = -radius; dr <= radius; dr++) {
     for (let dc = -radius; dc <= radius; dc++) {
@@ -32,7 +32,13 @@ function getBrushUpdates(
       const nr = centerRow + dr;
       const nc = centerCol + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-      updates.push({ row: nr, col: nc, type });
+      if (mode === 'wall') {
+        updates.push({ row: nr, col: nc, type: 'wall' });
+      } else if (mode === 'erase') {
+        updates.push({ row: nr, col: nc, type: 'empty', terrain: 'plains' });
+      } else {
+        updates.push({ row: nr, col: nc, type: 'empty', terrain: selectedTerrain });
+      }
     }
   }
   return updates;
@@ -48,6 +54,13 @@ function drawGrid(
 ) {
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
+  const pins: { cx: number; cy: number; color: string }[] = [];
+
+  // Hoist stable style assignments outside the inner loop.
+  if (showGrid) {
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 0.5;
+  }
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -55,12 +68,14 @@ function drawGrid(
       const key = `${r},${c}`;
       let color: string;
 
-      if (cell.type === 'wall') {
-        color = COLORS.wall;
-      } else if (cell.type === 'start') {
-        color = COLORS.start;
+      if (cell.type === 'start') {
+        pins.push({ cx: (c + 0.5) * BASE_CELL_PX, cy: (r + 0.5) * BASE_CELL_PX, color: COLORS.start });
+        color = TERRAIN_COLORS[cell.terrain];
       } else if (cell.type === 'end') {
-        color = COLORS.end;
+        pins.push({ cx: (c + 0.5) * BASE_CELL_PX, cy: (r + 0.5) * BASE_CELL_PX, color: COLORS.end });
+        color = TERRAIN_COLORS[cell.terrain];
+      } else if (cell.type === 'wall') {
+        color = COLORS.wall;
       } else if (pathSet.has(key)) {
         color = COLORS.path;
       } else if (frontierSet.has(key)) {
@@ -75,11 +90,17 @@ function drawGrid(
       ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
 
       if (showGrid) {
-        ctx.strokeStyle = COLORS.grid;
-        ctx.lineWidth = 0.5;
         ctx.strokeRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       }
     }
+  }
+
+  // Draw start/end pins as circles on top of everything else.
+  for (const { cx, cy, color } of pins) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, PIN_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
   }
 }
 
@@ -87,24 +108,22 @@ export function GridCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Track the previous cell during a drag so Bresenham can fill gaps.
   const prevCell = useRef<[number, number] | null>(null);
   const isDragging = useRef(false);
-
-  // Debounce timer for grid resize on container changes.
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const defaultLayoutApplied = useRef(false);
 
-  // Container size tracked in state so layout changes trigger a re-render and
-  // resize the canvas accordingly.
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   const cells = useGridStore((s) => s.cells);
   const interactionMode = useGridStore((s) => s.interactionMode);
+  const selectedTerrain = useGridStore((s) => s.selectedTerrain);
   const showGrid = useGridStore((s) => s.showGrid);
   const setStartCell = useGridStore((s) => s.setStartCell);
   const setEndCell = useGridStore((s) => s.setEndCell);
   const setCellBatch = useGridStore((s) => s.setCellBatch);
   const resizeGrid = useGridStore((s) => s.resizeGrid);
+  const initDefaultLayout = useGridStore((s) => s.initDefaultLayout);
 
   const result = useAlgorithmStore((s) => s.result);
   const currentStep = useAlgorithmStore((s) => s.currentStep);
@@ -112,23 +131,19 @@ export function GridCanvas() {
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
 
-  // Measure container and update canvas intrinsic size.
+  // Observe container size.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const { width, height } = entry.contentRect;
+      const { width, height } = entries[0].contentRect;
       setContainerSize({ w: Math.floor(width), h: Math.floor(height) });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Auto-resize the backing grid when the container size changes.
-  // Debounced so rapid window-resize events don't thrash the store.
-  // Note: does NOT reset the algorithm result — the current result stays
-  // visible until the user explicitly re-runs or clears.
+  // Resize (or initialize) the grid when container size changes.
   useEffect(() => {
     const { w, h } = containerSize;
     if (w === 0 || h === 0) return;
@@ -137,18 +152,24 @@ export function GridCanvas() {
     resizeTimerRef.current = setTimeout(() => {
       const newRows = Math.min(MAX_GRID_ROWS, Math.max(1, Math.floor(h / BASE_CELL_PX)));
       const newCols = Math.min(MAX_GRID_COLS, Math.max(1, Math.floor(w / BASE_CELL_PX)));
-      const { rows: curRows, cols: curCols } = useGridStore.getState();
-      if (newRows !== curRows || newCols !== curCols) {
-        resizeGrid(newRows, newCols);
+
+      if (!defaultLayoutApplied.current) {
+        // First measurement — apply the default scenario.
+        defaultLayoutApplied.current = true;
+        initDefaultLayout(newRows, newCols);
+      } else {
+        // rows/cols are from component scope — the current grid dimensions.
+        if (newRows !== rows || newCols !== cols) {
+          resizeGrid(newRows, newCols);
+        }
       }
     }, RESIZE_DEBOUNCE_MS);
 
     return () => {
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [containerSize, resizeGrid]);
+  }, [containerSize, resizeGrid, initDefaultLayout]);
 
-  // Build the sets needed for algorithm overlay and redraw.
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || containerSize.w === 0) return;
@@ -173,12 +194,10 @@ export function GridCanvas() {
     drawGrid(ctx, cells, exploredSet, frontierSet, pathSet, showGrid);
   }, [cells, result, currentStep, showGrid, containerSize]);
 
-  // Redraw whenever data or size changes.
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  /** Convert a canvas-relative mouse position to grid [row, col]. */
   const canvasToCell = useCallback(
     (mouseX: number, mouseY: number): [number, number] | null => {
       const col = Math.floor(mouseX / BASE_CELL_PX);
@@ -196,69 +215,56 @@ export function GridCanvas() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  const isBrushMode = (mode: InteractionMode): mode is 'wall' | 'erase' | 'terrain' =>
+    mode === 'wall' || mode === 'erase' || mode === 'terrain';
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
-
-      const { x, y } = getMousePos(e) ?? {};
-      if (x === undefined || y === undefined) return;
-      const pos = canvasToCell(x, y);
+      const pos = getMousePos(e);
       if (!pos) return;
-      const [row, col] = pos;
+      const cell = canvasToCell(pos.x, pos.y);
+      if (!cell) return;
+      const [row, col] = cell;
 
-      if (interactionMode === 'start') {
-        setStartCell(row, col);
-        return;
-      }
-      if (interactionMode === 'end') {
-        setEndCell(row, col);
-        return;
-      }
+      if (interactionMode === 'start') { setStartCell(row, col); return; }
+      if (interactionMode === 'end') { setEndCell(row, col); return; }
+      if (!isBrushMode(interactionMode)) return;
 
       isDragging.current = true;
       prevCell.current = [row, col];
-
-      const updates = getBrushUpdates(row, col, rows, cols, interactionMode === 'erase');
+      const updates = getBrushUpdates(row, col, rows, cols, interactionMode, selectedTerrain);
       if (updates.length > 0) setCellBatch(updates);
     },
-    [canvasToCell, interactionMode, rows, cols, setCellBatch, setStartCell, setEndCell]
+    [canvasToCell, interactionMode, rows, cols, selectedTerrain, setCellBatch, setStartCell, setEndCell]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!isDragging.current) return;
-
       const mousePos = getMousePos(e);
       if (!mousePos) return;
-      const { x, y } = mousePos;
-      const pos = canvasToCell(x, y);
-      if (!pos) return;
-      const [row, col] = pos;
+      const cell = canvasToCell(mousePos.x, mousePos.y);
+      if (!cell) return;
+      const [row, col] = cell;
 
-      if (!prevCell.current) {
-        prevCell.current = [row, col];
-        return;
-      }
+      if (!prevCell.current) { prevCell.current = [row, col]; return; }
+      if (!isBrushMode(interactionMode)) return;
 
-      // Collect all unique cell updates across every Bresenham point in one
-      // store call to minimise Zustand state transitions per mouse event.
       const [pr, pc] = prevCell.current;
       const line = bresenhamLine(pr, pc, row, col);
-      const erase = interactionMode === 'erase';
-
       const updateMap = new Map<string, CellBatchUpdate>();
       for (let i = 1; i < line.length; i++) {
         const [lr, lc] = line[i];
-        for (const u of getBrushUpdates(lr, lc, rows, cols, erase)) {
+        for (const u of getBrushUpdates(lr, lc, rows, cols, interactionMode, selectedTerrain)) {
           const key = `${u.row},${u.col}`;
           if (!updateMap.has(key)) updateMap.set(key, u);
         }
       }
-
       if (updateMap.size > 0) setCellBatch(Array.from(updateMap.values()));
       prevCell.current = [row, col];
     },
-    [canvasToCell, interactionMode, rows, cols, setCellBatch]
+    [canvasToCell, interactionMode, rows, cols, selectedTerrain, setCellBatch]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -281,7 +287,7 @@ export function GridCanvas() {
         />
 
         {/* Grid resolution readout */}
-        <div className="absolute bottom-2 right-2 text-xs text-slate-600 bg-slate-900/80 px-2 py-0.5 rounded pointer-events-none select-none">
+        <div className="absolute bottom-2 right-2 text-xs text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded pointer-events-none select-none">
           {rows}×{cols}
         </div>
       </div>

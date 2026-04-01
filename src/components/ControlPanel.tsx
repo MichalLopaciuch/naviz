@@ -1,6 +1,6 @@
 import { useGridStore } from '../store/gridStore';
 import { useAlgorithmStore } from '../store/algorithmStore';
-import type { AlgorithmType, HeuristicType, InteractionMode } from '../types';
+import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
 
 const DRAW_MODES: { value: InteractionMode; label: string }[] = [
@@ -8,15 +8,23 @@ const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'start', label: 'Start' },
   { value: 'end', label: 'End' },
   { value: 'erase', label: 'Erase' },
+  { value: 'terrain', label: 'Terrain' },
+];
+
+const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
+  { value: 'forest', label: 'Forest (×5)' },
+  { value: 'mountain', label: 'Mountain (×10)' },
 ];
 
 export function ControlPanel() {
   const {
     interactionMode,
+    selectedTerrain,
     showGrid,
     clearGrid,
     clearWalls,
     setInteractionMode,
+    setSelectedTerrain,
     setShowGrid,
     cells,
     startCell,
@@ -81,6 +89,22 @@ export function ControlPanel() {
           </button>
         ))}
       </div>
+
+      {/* Terrain picker (only when terrain mode active) */}
+      {interactionMode === 'terrain' && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-400">Type</label>
+          <select
+            className="bg-slate-700 text-slate-100 text-sm rounded px-2 py-1 border border-slate-600"
+            value={selectedTerrain}
+            onChange={(e) => setSelectedTerrain(e.target.value as TerrainType)}
+          >
+            {TERRAIN_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Show Grid toggle */}
       <button

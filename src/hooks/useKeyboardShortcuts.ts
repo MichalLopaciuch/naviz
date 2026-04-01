@@ -6,10 +6,12 @@ import type { AlgorithmType, TerrainType } from '../types';
 const ALGORITHM_CYCLE: AlgorithmType[] = ['astar', 'dijkstra', 'bfs', 'dfs'];
 const TERRAIN_CYCLE: TerrainType[] = ['forest', 'mountain'];
 
+/** Number of timeline steps advanced per 100px of scroll distance. */
+const SCROLL_STEPS_PER_100PX = 50;
+
 export function useKeyboardShortcuts(onHelp: () => void) {
   const onHelpRef = useRef(onHelp);
   useEffect(() => {
-    onHelpRef.current = onHelp;
   }, [onHelp]);
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function useKeyboardShortcuts(onHelp: () => void) {
       if (!result) return;
       e.preventDefault();
       const total = result.exploredOrder.length;
-      const delta = e.deltaY > 0 ? 1 : -1;
+      const delta = Math.round((e.deltaY / 100) * SCROLL_STEPS_PER_100PX) || (e.deltaY > 0 ? 1 : -1);
       setCurrentStep(Math.max(0, Math.min(total, currentStep + delta)));
     };
 

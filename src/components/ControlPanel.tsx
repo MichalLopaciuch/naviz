@@ -3,12 +3,11 @@ import { useAlgorithmStore } from '../store/algorithmStore';
 import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
 
-const DRAW_MODES: { value: InteractionMode; label: string }[] = [
-  { value: 'wall', label: 'Wall' },
-  { value: 'start', label: 'Start' },
-  { value: 'end', label: 'End' },
-  { value: 'erase', label: 'Erase' },
-  { value: 'terrain', label: 'Terrain' },
+const DRAW_MODES: { value: InteractionMode; label: string; title: string }[] = [
+  { value: 'wall', label: 'Wall', title: 'Wall brush (W)' },
+  { value: 'start-end', label: 'Start/End', title: 'Place start (left click) / end (right click) (S)' },
+  { value: 'erase', label: 'Erase', title: 'Erase brush (E)' },
+  { value: 'terrain', label: 'Terrain', title: 'Terrain brush (T)' },
 ];
 
 const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
@@ -16,7 +15,7 @@ const TERRAIN_OPTIONS: { value: TerrainType; label: string }[] = [
   { value: 'mountain', label: 'Mountain (×10)' },
 ];
 
-export function ControlPanel() {
+export function ControlPanel({ onHelp }: { onHelp: () => void }) {
   const {
     interactionMode,
     selectedTerrain,
@@ -75,10 +74,11 @@ export function ControlPanel() {
 
       {/* Draw modes */}
       <div className="flex items-center gap-1 border border-slate-600 rounded p-1">
-        {DRAW_MODES.map(({ value, label }) => (
+        {DRAW_MODES.map(({ value, label, title }) => (
           <button
             key={value}
             onClick={() => setInteractionMode(value)}
+            title={title}
             className={`text-xs px-2 py-1 rounded transition-colors ${
               interactionMode === value
                 ? 'bg-blue-600 text-white'
@@ -132,10 +132,22 @@ export function ControlPanel() {
         Clear Walls
       </button>
       <button
-        onClick={() => { clearGrid(); reset(); }}
+        onClick={() => {
+          if (window.confirm('Clear everything? This will remove all walls, terrain, and start/end points.')) {
+            clearGrid();
+            reset();
+          }
+        }}
         className="bg-red-800 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded transition-colors"
       >
         Clear All
+      </button>
+      <button
+        onClick={onHelp}
+        title="Keyboard shortcuts (?)"
+        className="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm w-7 h-7 flex items-center justify-center rounded transition-colors"
+      >
+        ?
       </button>
     </div>
   );

@@ -224,6 +224,17 @@ export function GridCanvas() {
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (interactionMode === 'start-end') {
+        const pos = getMousePos(e);
+        if (!pos) return;
+        const cell = canvasToCell(pos.x, pos.y);
+        if (!cell) return;
+        const [row, col] = cell;
+        if (e.button === 0) setStartCell(row, col);
+        else if (e.button === 2) setEndCell(row, col);
+        return;
+      }
+
       if (e.button !== 0) return;
       const pos = getMousePos(e);
       if (!pos) return;
@@ -231,8 +242,6 @@ export function GridCanvas() {
       if (!cell) return;
       const [row, col] = cell;
 
-      if (interactionMode === 'start') { setStartCell(row, col); return; }
-      if (interactionMode === 'end') { setEndCell(row, col); return; }
       if (!isBrushMode(interactionMode)) return;
 
       isDragging.current = true;
@@ -276,6 +285,10 @@ export function GridCanvas() {
     prevCell.current = null;
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+  }, []);
+
   return (
     <div className="relative w-full h-full flex flex-col">
       <div ref={containerRef} className="relative flex-1 overflow-hidden">
@@ -288,6 +301,7 @@ export function GridCanvas() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onContextMenu={handleContextMenu}
         />
 
         {/* Grid resolution readout */}

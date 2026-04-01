@@ -1,6 +1,6 @@
 export type CellType = 'empty' | 'wall' | 'start' | 'end';
 export type TerrainType = 'plains' | 'forest' | 'mountain';
-export type InteractionMode = 'wall' | 'start' | 'end' | 'erase' | 'terrain';
+export type InteractionMode = 'wall' | 'start-end' | 'erase' | 'terrain';
 export type HeuristicType = 'manhattan' | 'euclidean';
 export type AlgorithmType = 'astar' | 'dijkstra' | 'bfs' | 'dfs';
 

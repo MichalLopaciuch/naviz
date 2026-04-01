@@ -15,58 +15,6 @@ const makeGrid = (rows: number, cols: number): Cell[][] =>
     Array.from({ length: cols }, (_, c) => makeCell(r, c))
   );
 
-function buildDefaultLayout(
-  rows: number,
-  cols: number
-): { cells: Cell[][]; startCell: [number, number]; endCell: [number, number] } {
-  const cells = makeGrid(rows, cols);
-
-  const R = (f: number) => Math.max(0, Math.min(rows - 1, Math.round(f * (rows - 1))));
-  const C = (f: number) => Math.max(0, Math.min(cols - 1, Math.round(f * (cols - 1))));
-
-  // Start and end pins
-  const startR = R(0.15);
-  const startC = C(0.12);
-  const endR = R(0.82);
-  const endC = C(0.88);
-  cells[startR][startC] = { ...cells[startR][startC], type: 'start' };
-  cells[endR][endC] = { ...cells[endR][endC], type: 'end' };
-
-  // Horizontal wall at ~35% height, cols 25%–75%, gap at 48–52%
-  const wallRow = R(0.35);
-  for (let col = C(0.25); col <= C(0.75); col++) {
-    if (col >= C(0.48) && col <= C(0.52)) continue;
-    cells[wallRow][col] = { ...cells[wallRow][col], type: 'wall', weight: Infinity };
-  }
-
-  // Vertical wall at ~62% col, rows 50%–80%, gap at 63–67%
-  const wallCol = C(0.62);
-  for (let row = R(0.50); row <= R(0.80); row++) {
-    if (row >= R(0.63) && row <= R(0.67)) continue;
-    cells[row][wallCol] = { ...cells[row][wallCol], type: 'wall', weight: Infinity };
-  }
-
-  // Forest terrain: rows 45–70%, cols 25–55%
-  for (let row = R(0.45); row <= R(0.70); row++) {
-    for (let col = C(0.25); col <= C(0.55); col++) {
-      if (cells[row][col].type === 'empty') {
-        cells[row][col] = { ...cells[row][col], terrain: 'forest', weight: TERRAIN_COSTS.forest };
-      }
-    }
-  }
-
-  // Mountain terrain: rows 15–38%, cols 55–78%
-  for (let row = R(0.15); row <= R(0.38); row++) {
-    for (let col = C(0.55); col <= C(0.78); col++) {
-      if (cells[row][col].type === 'empty') {
-        cells[row][col] = { ...cells[row][col], terrain: 'mountain', weight: TERRAIN_COSTS.mountain };
-      }
-    }
-  }
-
-  return { cells, startCell: [startR, startC], endCell: [endR, endC] };
-}
-
 /** Minimal unit used by setCellBatch for efficient bulk updates. */
 export interface CellBatchUpdate {
   row: number;
@@ -91,7 +39,6 @@ interface GridState {
   clearGrid: () => void;
   clearWalls: () => void;
   resizeGrid: (newRows: number, newCols: number) => void;
-  initDefaultLayout: (newRows: number, newCols: number) => void;
   setInteractionMode: (mode: InteractionMode) => void;
   setSelectedTerrain: (terrain: TerrainType) => void;
   setShowGrid: (v: boolean) => void;
@@ -185,12 +132,6 @@ export const useGridStore = create<GridState>((set) => ({
           ? state.endCell
           : null;
       return { rows: newRows, cols: newCols, cells: newCells, startCell, endCell };
-    }),
-
-  initDefaultLayout: (newRows, newCols) =>
-    set(() => {
-      const { cells, startCell, endCell } = buildDefaultLayout(newRows, newCols);
-      return { rows: newRows, cols: newCols, cells, startCell, endCell };
     }),
 
   setInteractionMode: (mode) => set({ interactionMode: mode }),

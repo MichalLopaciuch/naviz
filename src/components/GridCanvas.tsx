@@ -66,28 +66,41 @@ function drawGrid(
     for (let c = 0; c < cols; c++) {
       const cell = cells[r][c];
       const key = `${r},${c}`;
-      let color: string;
 
       if (cell.type === 'start') {
         pins.push({ cx: (c + 0.5) * BASE_CELL_PX, cy: (r + 0.5) * BASE_CELL_PX, color: COLORS.start });
-        color = TERRAIN_COLORS[cell.terrain];
+        ctx.fillStyle = TERRAIN_COLORS[cell.terrain];
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       } else if (cell.type === 'end') {
         pins.push({ cx: (c + 0.5) * BASE_CELL_PX, cy: (r + 0.5) * BASE_CELL_PX, color: COLORS.end });
-        color = TERRAIN_COLORS[cell.terrain];
+        ctx.fillStyle = TERRAIN_COLORS[cell.terrain];
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       } else if (cell.type === 'wall') {
-        color = COLORS.wall;
+        ctx.fillStyle = COLORS.wall;
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       } else if (pathSet.has(key)) {
-        color = COLORS.path;
+        ctx.fillStyle = COLORS.path;
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       } else if (frontierSet.has(key)) {
-        color = COLORS.frontier;
+        // Draw terrain beneath, then semi-transparent frontier overlay.
+        ctx.fillStyle = TERRAIN_COLORS[cell.terrain];
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = COLORS.frontier;
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+        ctx.globalAlpha = 1;
       } else if (exploredSet.has(key)) {
-        color = COLORS.explored;
+        // Draw terrain beneath, then semi-transparent explored overlay.
+        ctx.fillStyle = TERRAIN_COLORS[cell.terrain];
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = COLORS.explored;
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
+        ctx.globalAlpha = 1;
       } else {
-        color = TERRAIN_COLORS[cell.terrain];
+        ctx.fillStyle = TERRAIN_COLORS[cell.terrain];
+        ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
       }
-
-      ctx.fillStyle = color;
-      ctx.fillRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
 
       if (showGrid) {
         ctx.strokeRect(c * BASE_CELL_PX, r * BASE_CELL_PX, BASE_CELL_PX, BASE_CELL_PX);
@@ -111,7 +124,6 @@ export function GridCanvas() {
   const prevCell = useRef<[number, number] | null>(null);
   const isDragging = useRef(false);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const defaultLayoutApplied = useRef(false);
 
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
@@ -123,7 +135,6 @@ export function GridCanvas() {
   const setEndCell = useGridStore((s) => s.setEndCell);
   const setCellBatch = useGridStore((s) => s.setCellBatch);
   const resizeGrid = useGridStore((s) => s.resizeGrid);
-  const initDefaultLayout = useGridStore((s) => s.initDefaultLayout);
 
   const result = useAlgorithmStore((s) => s.result);
   const currentStep = useAlgorithmStore((s) => s.currentStep);
@@ -153,22 +164,15 @@ export function GridCanvas() {
       const newRows = Math.min(MAX_GRID_ROWS, Math.max(1, Math.floor(h / BASE_CELL_PX)));
       const newCols = Math.min(MAX_GRID_COLS, Math.max(1, Math.floor(w / BASE_CELL_PX)));
 
-      if (!defaultLayoutApplied.current) {
-        // First measurement — apply the default scenario.
-        defaultLayoutApplied.current = true;
-        initDefaultLayout(newRows, newCols);
-      } else {
-        // rows/cols are from component scope — the current grid dimensions.
-        if (newRows !== rows || newCols !== cols) {
-          resizeGrid(newRows, newCols);
-        }
+      if (newRows !== rows || newCols !== cols) {
+        resizeGrid(newRows, newCols);
       }
     }, RESIZE_DEBOUNCE_MS);
 
     return () => {
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [containerSize, resizeGrid, initDefaultLayout]);
+  }, [containerSize, resizeGrid]);
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;

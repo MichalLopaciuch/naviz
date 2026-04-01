@@ -3,7 +3,7 @@ import type { AlgorithmType, HeuristicType, AlgorithmResult, Cell } from '../typ
 import { ALGORITHMS } from '../algorithms';
 
 /** Duration of the auto-play animation in milliseconds. */
-const ANIMATION_DURATION_MS = 1500;
+const ANIMATION_DURATION_MS = 750;
 
 // Module-level RAF handle so it can be cancelled from outside the store action.
 let animRafId: number | null = null;

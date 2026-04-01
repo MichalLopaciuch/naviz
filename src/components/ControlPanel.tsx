@@ -2,6 +2,7 @@ import { useGridStore } from '../store/gridStore';
 import { useAlgorithmStore } from '../store/algorithmStore';
 import type { AlgorithmType, HeuristicType, InteractionMode, TerrainType } from '../types';
 import { ALGORITHM_LABELS } from '../algorithms';
+import { isWasmSupported } from '../algorithms/wasm';
 
 const DRAW_MODES: { value: InteractionMode; label: string }[] = [
   { value: 'wall', label: 'Wall' },
@@ -30,7 +31,7 @@ export function ControlPanel() {
     startCell,
     endCell,
   } = useGridStore();
-  const { selectedAlgorithm, heuristic, setAlgorithm, setHeuristic, runAlgorithm, reset } =
+  const { selectedAlgorithm, heuristic, useWasm, setAlgorithm, setHeuristic, setUseWasm, runAlgorithm, reset } =
     useAlgorithmStore();
 
   const handleRun = () => {
@@ -104,6 +105,28 @@ export function ControlPanel() {
             ))}
           </select>
         </div>
+      )}
+
+      {/* WASM toggle */}
+      {isWasmSupported() ? (
+        <button
+          onClick={() => setUseWasm(!useWasm)}
+          title="Toggle between JavaScript and WebAssembly execution"
+          className={`text-xs px-2 py-1 rounded border transition-colors ${
+            useWasm
+              ? 'bg-violet-600 border-violet-500 text-white'
+              : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+          }`}
+        >
+          WASM
+        </button>
+      ) : (
+        <span
+          title="WebAssembly is not supported in this browser"
+          className="text-xs px-2 py-1 rounded border border-slate-700 text-slate-600 cursor-not-allowed select-none"
+        >
+          WASM
+        </span>
       )}
 
       {/* Show Grid toggle */}

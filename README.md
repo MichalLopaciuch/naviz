@@ -3,17 +3,19 @@
 A 2D pathfinding visualizer built with Vite, React, TypeScript, Tailwind CSS, and Zustand.  
 Algorithms are available in two execution engines — **TypeScript (JS)** and **Rust-compiled WebAssembly (WASM)** — so you can compare compute times on the same grid with one click.
 
-![NAVIZ Screenshot](https://github.com/user-attachments/assets/02d4d28b-5a61-4fb6-a558-2260c319376e)
+![NAVIZ Screenshot](https://github.com/user-attachments/assets/44fd63dc-27c1-460f-9ed5-045016bdbddf)
 
 ## Features
 
 - **Four algorithms**: A\*, Dijkstra, BFS, DFS
 - **Two execution engines**: JavaScript (default) and WebAssembly (Rust) — toggle with the **WASM** button
 - **Weighted terrain**: Plains (×1), Forest (×5), Mountain (×10) — Dijkstra and A\* route around expensive terrain
-- **Rectangle obstacle drawing**: Click and drag to draw walls or paint terrain
-- **Timeline scrubber**: Pre-compute the full exploration history, then scrub with a slider for instant replay
+- **Draw modes**: Wall, Start/End (left-click = start, right-click = end), Erase, Terrain — all support click-and-drag
+- **Grid lines toggle**: Show or hide the grid overlay with the **Grid** button
+- **Timeline scrubber**: Pre-compute the full exploration history, then scrub with a slider (or `Ctrl + Scroll`) for instant replay
 - **Configurable heuristics**: Manhattan or Euclidean for A\*
 - **8-directional movement** (always enabled)
+- **Keyboard shortcuts**: Full keyboard control — see the **?** button or the [Shortcuts](#keyboard-shortcuts) table below
 
 ---
 
@@ -29,11 +31,14 @@ src/
 │   ├── wasm.ts           # WASM adapter + lazy loader
 │   └── index.ts          # Algorithm registry
 ├── components/
-│   ├── ControlPanel.tsx  # Top bar: algorithm, heuristic, draw mode, WASM toggle
+│   ├── ControlPanel.tsx  # Top bar: algorithm, heuristic, draw mode, WASM/Grid toggles, actions
 │   ├── GridCanvas.tsx    # Canvas-based grid renderer + mouse interactions
+│   ├── HelpModal.tsx     # Keyboard & mouse shortcut reference modal
 │   ├── StatsPanel.tsx    # Sidebar: cells explored, path length, engine badge
 │   ├── TerrainLegend.tsx # Sidebar: terrain colour key
 │   └── Timeline.tsx      # Bottom scrubber
+├── hooks/
+│   └── useKeyboardShortcuts.ts  # Global keyboard + Ctrl+Scroll shortcut handling
 ├── store/
 │   ├── algorithmStore.ts # Algorithm selection, run, animation, WASM state
 │   └── gridStore.ts      # Grid cells, interaction mode, start/end
@@ -158,12 +163,11 @@ npm run typecheck    # tsc --noEmit (no emit, type errors only)
 
 ## Usage
 
-1. Click **Start** mode and click a cell to place the start point
-2. Click **End** mode and click a cell to place the end point
-3. Click **Wall** mode and drag to draw obstacles
-4. Optionally, click **Terrain** mode to paint weighted terrain
-5. Select an algorithm (A\*, Dijkstra, BFS, DFS) and click **▶ Run**
-6. Drag the timeline slider to scrub through the exploration history
+1. Click **Start/End** mode → **left-click** a cell to place the start point, **right-click** a cell to place the end point
+2. Click **Wall** mode and drag to draw obstacles
+3. Optionally, click **Terrain** mode to paint weighted terrain
+4. Select an algorithm (A\*, Dijkstra, BFS, DFS) and click **▶ Run**
+5. Drag the timeline slider to scrub through the exploration history
 
 ### JS vs WASM comparison
 
@@ -172,4 +176,22 @@ npm run typecheck    # tsc --noEmit (no emit, type errors only)
 3. Click **▶ Run** again — compare Compute Time (`WASM` badge)
 
 Both runs produce identical paths and exploration sequences; only the engine differs.
+
+---
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Space` | Run algorithm |
+| `W` | Switch to Wall mode |
+| `S` | Switch to Start/End mode |
+| `E` | Switch to Erase mode |
+| `T` | Switch to Terrain mode / cycle terrain type |
+| `A` | Cycle to next algorithm |
+| `R` | Reset canvas (with confirmation) |
+| `/ or ?` | Open keyboard shortcut help |
+| `Ctrl + Scroll` | Step through timeline |
+
+Click the **?** button in the top-right corner of the toolbar to see the shortcut reference inside the app.
 

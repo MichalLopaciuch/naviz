@@ -12,6 +12,7 @@ const SCROLL_STEPS_PER_100PX = 50;
 export function useKeyboardShortcuts(onHelp: () => void) {
   const onHelpRef = useRef(onHelp);
   useEffect(() => {
+    onHelpRef.current = onHelp;
   }, [onHelp]);
 
   useEffect(() => {

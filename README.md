@@ -3,7 +3,7 @@
 A 2D pathfinding visualizer built with Vite, React, TypeScript, Tailwind CSS, and Zustand.  
 Algorithms are available in two execution engines — **TypeScript (JS)** and **Rust-compiled WebAssembly (WASM)** — so you can compare compute times on the same grid with one click.
 
-![NAVIZ Screenshot](https://github.com/user-attachments/assets/44fd63dc-27c1-460f-9ed5-045016bdbddf)
+![NAVIZ Preview](.github/preview.png)
 
 ## Features
 
